@@ -1,0 +1,182 @@
+<html>
+  <head>
+    <script>
+
+      // Create an array to store tweets
+      var tweets = [];
+
+      function clearDiv(divId) {
+        var div = document.getElementById(divId);
+        div.innerHTML = ""; // clears content of div
+      }
+
+      function isCookieSet(cookieName) {
+        var cookies = document.cookie.split(';');
+        for (var i = 0; i < cookies.length; i++) {
+            var cookie = cookies[i].trim();
+            if (cookie.indexOf(cookieName + '=') === 0) {
+                return true;
+            }
+        }
+        return false;
+      }
+
+      function displayError(errorMessage) {
+        var errorDiv = document.getElementById('error');
+
+        if (errorDiv) {
+            errorDiv.textContent = errorMessage;
+        }
+      }
+
+      // Gets a list of all tweets
+      function getTweets() {
+        var oReq = new XMLHttpRequest();
+        oReq.addEventListener("load", function () {
+          if (oReq.status === 200) {
+            clearDiv("error");
+
+            var theData = JSON.parse(oReq.responseText);
+            tweets = theData;
+            displayTweets();
+          } else if (oReq.status == 401) {
+            displayError(oReq.responseText);
+          }
+        });
+        oReq.open("GET", "/api/tweet");
+        oReq.send();
+      }
+
+      // Create a new tweet on the server
+      function postTweet() {
+        var newTweetText = document.getElementById("makePostText").value;
+        var newTweet = { text: newTweetText };
+        var oReq = new XMLHttpRequest();
+        oReq.addEventListener("load", function () {
+          if (oReq.status === 201) {
+            clearDiv("error");
+            getTweets();
+          } else if (oReq.status == 401) {
+            displayError(oReq.responseText);
+          }
+        });
+        oReq.open("POST", "/api/tweet");
+        oReq.setRequestHeader("Content-Type", "application/json");
+        oReq.send(JSON.stringify(newTweet));
+      }
+
+
+      function updateTweet(tweetId) {
+        // get the new tweet text
+        var newText = document.getElementById("tweet" + tweetId).value;
+
+        // make put with tweetID
+        var oReq = new XMLHttpRequest();
+        oReq.addEventListener("load", function () {
+          // If successful, update the corresponding tweet
+          if (oReq.status === 204) {
+            getTweets();
+          } else if (oReq.status == 401) {
+            displayError(oReq.responseText);
+          }
+        });
+        oReq.open("PUT", "/api/tweet/" + tweetId);
+        oReq.setRequestHeader("Content-Type", "application/json");
+        oReq.send(JSON.stringify({ text: newText }));
+      }
+
+      function displayTweets() {
+        var tweetTable = document.getElementById("tweets");
+        var tweetHTML = "<tr><td>No tweets available.</td></tr>";
+
+        if (tweets.length > 0) {
+          tweetHTML = ""; // Clear the loading message
+          for (var i = 0; i < tweets.length; i++) {
+            // Display each tweet as an input field with a submit button
+            tweetHTML += `<tr><td>${tweets[i].username} last edited: <input type='text' id='tweet${tweets[i].tid}' value='${tweets[i].text}'> <button onclick='updateTweet("${tweets[i].tid}")'>Submit</button></td></tr>`;
+          }
+        } 
+
+        tweetTable.innerHTML = tweetHTML;
+      }
+
+
+      function setup() {
+
+        if (isCookieSet("username")) {
+          clearDiv("login");
+          createMakePostDiv();
+          getTweets();
+          
+        } else {
+          createLoginDiv();
+          clearDiv("makePost");
+          clearDiv("tweets");
+        } 
+      }
+
+
+      function createMakePostDiv() {
+        var makePostDiv = document.getElementById("makePost");
+  
+        // Set the inner HTML of the "makePost" div
+        makePostDiv.innerHTML = `
+          <div>New Post:</div><br/>
+          <div>What's on your mind?
+          <input type="text" id="makePostText" placeholder="Enter a new tweet"><br/>
+          <button onclick="postTweet()">Send it!</button>
+          <div>
+          `;
+      }
+
+
+      function createLoginDiv() {
+        var loginDiv = document.getElementById("login");
+        
+        // Set the inner HTML of the "login" div
+        loginDiv.innerHTML = `
+          <input type="text" id="usernameInput" placeholder="Enter your username">
+          <button onclick="performLogin()">Login</button>
+          `;
+      }
+
+
+      function performLogin() {
+        var username = document.getElementById("usernameInput").value;
+
+        // Create an object to send as a request payload
+        var loginData = { username: username };
+
+        // Send a POST request to the server to log in
+        var oReq = new XMLHttpRequest();
+        oReq.addEventListener("load", function () {
+          if (oReq.status === 200) {
+            // Login was successful
+            clearDiv("error");
+            clearDiv("login");
+            createMakePostDiv();
+            getTweets();
+          } else if (oReq.status == 400) {
+            displayError(oReq.responseText);
+          }
+        });
+
+        oReq.open("POST", "/api/login");
+        oReq.setRequestHeader("Content-Type", "application/json");
+        oReq.send(JSON.stringify(loginData));
+      }
+
+
+    </script>
+  </head>
+  <body onload="setup()">
+    <p>Ecks:</p>
+    <div id="makePost"></div>
+    <div id="login"></div>
+    <div id="error"></div>
+    <div id="posts"></div>
+    <table id="tweets">
+      <tr><td>Loading...</td></tr>
+    </table>
+  </body>
+</html>
